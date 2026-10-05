@@ -101,7 +101,7 @@ export async function summary(campaign: Campaign) {
     ],
     channels,
     colleges: colleges.map((c) => ({ college: c.college, registrations: Number(c.n), attended: Number(c.attended) })),
-    gradYears: gradYears.map((g) => ({ year: g.gradYear, n: g._count._all, target: g.gradYear === cfg.targetGradYear })),
+    gradYears: gradYears.map((g) => ({ year: g.gradYear, n: g._count._all, target: g.gradYear === cfg.targetGradYear ? "true" : "false" })),
     referrals: {
       total: referralTotal,
       qualified: referralsBy.qualified ?? 0,
