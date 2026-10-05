@@ -1,0 +1,209 @@
+// LaunchPad data model: entities + an append-only event stream.
+// Postgres only (Neon in production). No local filesystem state anywhere.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model Campaign {
+  id           String         @id @default(cuid())
+  slug         String         @unique
+  name         String
+  // Editable landing + reward config, validated by Zod (src/lib/config.ts) on every write.
+  config       Json
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  registrations Registration[]
+  experiments  Experiment[]
+  workshops    Workshop[]
+  events       Event[]
+  ambassadors  Ambassador[]
+}
+
+// Every registrant gets a referral code, so every registrant can refer.
+model Registration {
+  id           String      @id @default(cuid())
+  campaignId   String
+  campaign     Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String
+  email        String
+  phone        String
+  college      String
+  gradYear     Int
+  branch       String?
+  code         String      @unique
+  channel      String      @default("direct")
+  visitorId    String?
+  variantId    String?
+  variant      ExperimentVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  ipHash       String?
+  referredById String?
+  referredBy   Registration?  @relation("ReferredBy", fields: [referredById], references: [id], onDelete: SetNull)
+  referees     Registration[] @relation("ReferredBy")
+  ambassadorId String?
+  ambassador   Ambassador?  @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
+  isDemo       Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  referralsMade Referral[] @relation("Referrer")
+  referralIn   Referral?   @relation("Referred")
+  attendance   Attendance?
+  rewards      Reward[]
+
+  @@unique([campaignId, email])
+  @@unique([campaignId, phone])
+  @@index([campaignId, createdAt])
+  @@index([campaignId, channel])
+}
+
+// Official campus ambassadors (club leads, class reps). Their links carry a tag
+// so their whole college's sign-ups are credited, not just direct referrals.
+model Ambassador {
+  id         String         @id @default(cuid())
+  campaignId String
+  campaign   Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name       String
+  college    String
+  tag        String
+  phone      String?
+  isDemo     Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  registrations Registration[]
+
+  @@unique([campaignId, tag])
+}
+
+// referrer -> referred. A referral only becomes "qualified" when the referred
+// student actually attends the workshop; only qualified referrals earn rewards.
+model Referral {
+  id          String       @id @default(cuid())
+  referrerId  String
+  referrer    Registration @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId  String       @unique
+  referred    Registration @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  status      String       @default("pending") // pending | qualified | flagged
+  flagReason  String?
+  createdAt   DateTime     @default(now())
+  qualifiedAt DateTime?
+
+  @@index([referrerId, status])
+}
+
+model Experiment {
+  id              String              @id @default(cuid())
+  campaignId      String
+  campaign        Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  key             String
+  name            String
+  hypothesis      String?
+  status          String              @default("running") // running | promoted | stopped
+  minSamplePerArm Int                 @default(300)
+  winnerVariantId String?
+  promotedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  variants        ExperimentVariant[]
+  assignments     ExperimentAssignment[]
+
+  @@unique([campaignId, key])
+}
+
+model ExperimentVariant {
+  id           String       @id @default(cuid())
+  experimentId String
+  experiment   Experiment   @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  key          String // A, B, C
+  headline     String
+  subhead      String
+  cta          String
+  weight       Int          @default(50)
+  isControl    Boolean      @default(false)
+  assignments  ExperimentAssignment[]
+  registrations Registration[]
+
+  @@unique([experimentId, key])
+}
+
+model ExperimentAssignment {
+  id           String            @id @default(cuid())
+  experimentId String
+  experiment   Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variantId    String
+  variant      ExperimentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  visitorId    String
+  isDemo       Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+
+  @@unique([experimentId, visitorId])
+  @@index([variantId])
+}
+
+// Append-only growth event stream. dedupeKey makes repeated beacons idempotent.
+model Event {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type           String
+  visitorId      String?
+  registrationId String?
+  variantId      String?
+  channel        String?
+  meta           Json?
+  dedupeKey      String?  @unique
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([campaignId, type, createdAt])
+}
+
+model Workshop {
+  id         String       @id @default(cuid())
+  campaignId String
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title      String
+  startsAt   DateTime
+  durationMin Int         @default(60)
+  joinUrl    String?
+  attendance Attendance[]
+}
+
+model Attendance {
+  id             String       @id @default(cuid())
+  workshopId     String
+  workshop       Workshop     @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  registrationId String       @unique
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  minutes        Int
+  source         String       @default("import") // import | manual
+  isDemo         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model Reward {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  kind           String // tier | leaderboard
+  label          String
+  amountInr      Int          @default(0)
+  status         String       @default("eligible") // eligible | issued | rejected
+  qualifiedRefs  Int          @default(0)
+  isDemo         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  issuedAt       DateTime?
+
+  @@unique([registrationId, kind, label])
+}
+
+// Fixed-window rate limiting that works across stateless serverless instances.
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

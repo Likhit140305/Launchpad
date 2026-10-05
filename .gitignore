@@ -1,0 +1,16 @@
+.neon
+.env*
+!.env.example
+node_modules/
+.nodemodules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+.arena/
+.impeccable/
+.DS_Store
+coverage/
+build/
+dist/
+*.log
