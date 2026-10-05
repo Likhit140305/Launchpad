@@ -14,3 +14,6 @@ coverage/
 build/
 dist/
 *.log
+.claude/
+AGENTS.md
+CLAUDE.md
