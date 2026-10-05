@@ -218,9 +218,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh">
       <div className="on-navy bg-navy-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-          <Link href="/" aria-label="Workshop page">
-            <Wordmark />
-          </Link>
+          <Wordmark />
           <Link href="/" className="text-sm font-semibold text-navy-200 hover:text-white">
             Workshop details
           </Link>
