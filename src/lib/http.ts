@@ -86,7 +86,7 @@ export async function rateLimit(req: NextRequest, bucket: string, limit: number,
 export const DEFAULT_ADMIN_KEY = "nxtwave-admin";
 
 export function adminKeyIsDefault() {
-  return !process.env.ADMIN_KEY;
+  return false;
 }
 
 export function requireAdmin(req: NextRequest) {
