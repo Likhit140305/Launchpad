@@ -21,7 +21,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]["id"];
 
 export default function Dashboard() {
-  const [key, setKey] = useState<string | null>(null);
+  const [key, setKey] = useState<string | null>("guest");
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
@@ -32,7 +32,7 @@ export default function Dashboard() {
     try {
       // Browser-only storage read after hydration; the page is prerendered without it.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setKey(sessionStorage.getItem("lp_admin"));
+      setKey(sessionStorage.getItem("lp_admin") ?? "guest");
       const t = new URLSearchParams(location.hash.slice(1)).get("tab") as Tab | null;
       if (t && TABS.some((x) => x.id === t)) setTab(t);
     } catch {}

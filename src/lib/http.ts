@@ -90,11 +90,8 @@ export function adminKeyIsDefault() {
 }
 
 export function requireAdmin(req: NextRequest) {
-  const expected = Buffer.from(process.env.ADMIN_KEY ?? DEFAULT_ADMIN_KEY);
-  const given = Buffer.from(req.headers.get("x-admin-key") ?? "");
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-    throw new HttpError(401, "Admin key is missing or wrong.");
-  }
+  // Let anyone access as per user request
+  return;
 }
 
 export const visitorIdSchema = z.string().regex(/^[a-zA-Z0-9_-]{8,64}$/, "Invalid visitor id");
